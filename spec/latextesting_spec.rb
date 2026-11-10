@@ -1,6 +1,18 @@
 # frozen_string_literal: true
 
+require "rexml/document"
+
 RSpec.describe LatexTesting do
+  def build_test(suite, name, &definition)
+    test = suite.test(name, &definition)
+    test.define_singleton_method(:build_raw) do |_source, temp_dir|
+      File.write(File.join(temp_dir, "fixture.pdf"), "pdf")
+      File.write(File.join(temp_dir, "fixture.log"), "log")
+      true
+    end
+    test
+  end
+
   it "has a version number" do
     expect(LatexTesting::VERSION).not_to be nil
   end
@@ -55,6 +67,73 @@ RSpec.describe LatexTesting do
     expect do
       described_class.run(suite: suite, test: test)
     end.to raise_error(ArgumentError, "test does not belong to the selected suite")
+  end
+
+  it "writes JUnit XML with failures and treats skipped manual tests as passes" do
+    Dir.mktmpdir do |directory|
+      File.write(File.join(directory, "fixture.tex"), "")
+      suite = described_class::TestSuite.new(
+        "Suite & <group>",
+        output_dir: directory,
+        input_dir: directory
+      )
+      build_test(suite, "Manual & <check>") do
+        file "fixture.tex"
+        user_assert("The title is visible")
+      end
+      build_test(suite, "Failure") do
+        file "fixture.tex"
+        assert("expected & <text>") { fail("actual & <text>") }
+      end
+      report = File.join(directory, "reports", "testresults.xml")
+
+      expect { described_class.run({ junit_report: report }, suite: suite) }
+        .to output.to_stdout
+
+      document = REXML::Document.new(File.read(report))
+      suite_element = document.elements["testsuites/testsuite"]
+      test_cases = suite_element.get_elements("testcase")
+      failure = test_cases[1].elements["failure"]
+
+      expect(suite_element.attributes["tests"]).to eq("2")
+      expect(suite_element.attributes["failures"]).to eq("1")
+      expect(suite_element.attributes["skipped"]).to eq("0")
+      expect(suite_element.attributes["name"]).to eq("Suite & <group>")
+      expect(document.root.attributes["tests"]).to eq("2")
+      expect(document.root.attributes["failures"]).to eq("1")
+      expect(test_cases.map { |test_case| test_case.attributes["name"] })
+        .to eq(["Manual & <check>", "Failure"])
+      expect(test_cases.first.elements["skipped"]).to be_nil
+      expect(failure.attributes["message"]).to eq("expected & <text>: actual & <text>")
+      expect(failure.text).to eq("expected & <text>: actual & <text>")
+    end
+  end
+
+  it "reports only a selected test" do
+    Dir.mktmpdir do |directory|
+      File.write(File.join(directory, "fixture.tex"), "")
+      suite = described_class::TestSuite.new(
+        "Suite",
+        output_dir: directory,
+        input_dir: directory
+      )
+      selected_test = build_test(suite, "Selected") do
+        file "fixture.tex"
+      end
+      build_test(suite, "Other") do
+        file "fixture.tex"
+      end
+      report = File.join(directory, "testresults.xml")
+      File.write(report, "previous report")
+
+      expect { described_class.run({ junit_report: report }, test: selected_test) }
+        .to output.to_stdout
+
+      document = REXML::Document.new(File.read(report))
+      test_cases = document.get_elements("testsuites/testsuite/testcase")
+      expect(test_cases.map { |test_case| test_case.attributes["name"] })
+        .to eq(["Selected"])
+    end
   end
 end
 

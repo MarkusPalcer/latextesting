@@ -44,15 +44,31 @@ module LatexTesting
         raise ArgumentError, "test does not belong to the selected suite"
       end
 
-      if test
-        test.execute(options)
-      elsif suite
-        suite.execute(options)
-      else
-        @files.each_value do |test_file|
-          test_file.execute(options)
+      report_suites = if test
+                        [{ name: suite&.name || "LatexTesting", tests: [test] }]
+                      elsif suite
+                        [{ name: suite.name, tests: suite.tests }]
+                      else
+                        @files.each_value.flat_map do |test_file|
+                          test_file.suites.map do |test_suite|
+                            { name: test_suite.name, tests: test_suite.tests }
+                          end
+                        end
+                      end
+
+      result =
+        if test
+          test.execute(options)
+        elsif suite
+          suite.execute(options)
+        else
+          @files.each_value do |test_file|
+            test_file.execute(options)
+          end
         end
-      end
+
+      JUnitReport.write(options[:junit_report], report_suites) if options[:junit_report]
+      result
     end
   end
 end

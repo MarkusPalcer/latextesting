@@ -13,6 +13,7 @@ require_relative "latextesting/assertion/pdf_execution"
 require_relative "latextesting/test"
 require_relative "latextesting/test_suite"
 require_relative "latextesting/test_file"
+require_relative "latextesting/junit_report"
 require_relative "latextesting/runner"
 
 module LatexTesting

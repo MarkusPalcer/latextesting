@@ -29,10 +29,12 @@ LatexTesting.run(suite: test_suites.first)
 LatexTesting.run(test: test_suites.first.tests.first)
 ```
 
-Pass an options hash to enable manual visual assertions:
+Pass an options hash to enable manual visual assertions or write a JUnit XML
+report:
 
 ```ruby
 LatexTesting.run(user_interaction: true)
+LatexTesting.run(junit_report: "out/testresults.xml")
 ```
 
 With the default options, tests containing `user_assert` print the number of
@@ -40,6 +42,10 @@ skipped assertions in yellow before `MANUAL TESTS SKIPPED` (for example,
 `2 MANUAL TESTS SKIPPED`) and count as passed. Interactive runs show the
 assertion and PDF path and prompt for `yes`/`y` or `no`/`n`. A yes response
 prints `PASSED`; a no response fails the test.
+
+When `junit_report` is set to a filename, each run overwrites that file with a
+JUnit XML report containing only the tests executed in that run. Failed tests
+are reported as failures; tests with skipped manual assertions count as passed.
 
 To load one particular definition file instead, use
 `LatexTesting.parse_file` and then call `LatexTesting.run`.

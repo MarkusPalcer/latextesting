@@ -16,7 +16,10 @@ expanded filename.
   cached definition file unless a suite or test selected from the scan result
   is supplied. When both selectors are supplied, the test must belong to that
   suite. The cache is not cleared and individual results are not aggregated
-  into a process status.
+  into a process status. If `options[:junit_report]` is set to a filename, the
+  run overwrites that file with JUnit XML for the tests selected by this
+  invocation. Failed tests receive `<failure>` elements; skipped manual
+  assertions are represented as passing test cases.
 
 The execution order is stable: files are parsed by sorted path; within a file,
 the implicit file-level suite runs before named suites; suites and tests run

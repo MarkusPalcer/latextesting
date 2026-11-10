@@ -2,7 +2,7 @@
 
 module LatexTesting
   class Test
-    attr_reader :name
+    attr_reader :name, :result, :failure_message
 
     def initialize(name, output_dir:, input_dir:)
       @name = name.to_s
@@ -12,6 +12,8 @@ module LatexTesting
       @expect_compilation_failure = false
       @assertions = []
       @output_pdf_path = File.join(@output_dir, "#{@name}.pdf")
+      @result = nil
+      @failure_message = nil
     end
 
     def assert(name = nil, &block)
@@ -41,6 +43,8 @@ module LatexTesting
     def execute(options = {})
       print "    #{@name} - "
       begin
+        @result = nil
+        @failure_message = nil
         raise "no .tex file given" unless @file
 
         file = Pathname.new(@input_dir).join(@file).to_s
@@ -69,14 +73,19 @@ module LatexTesting
         end
 
         if skipped_manual_assertions.positive?
+          @result = :manual_tests_skipped
           puts "#{YELLOW}#{skipped_manual_assertions} MANUAL TESTS SKIPPED#{RESET}"
         elsif manual_tests_passed
+          @result = :passed
           puts "#{GREEN}PASSED#{RESET}"
         else
+          @result = :passed
           puts "#{GREEN}PASS#{RESET}"
         end
         true
       rescue StandardError => e
+        @result = :failed
+        @failure_message = e.message
         puts "#{RED}FAIL#{RESET}: #{e.message}"
         false
       end
