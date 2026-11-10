@@ -4,7 +4,7 @@ require_relative "lib/latextesting/version"
 
 Gem::Specification.new do |spec|
   spec.name = "latextesting"
-  spec.version = Latextesting::VERSION
+  spec.version = LatexTesting::VERSION
   spec.authors = ["TODO: Write your name"]
   spec.email = ["TODO: Write your email address"]
 
@@ -37,8 +37,7 @@ Gem::Specification.new do |spec|
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
-  # Uncomment to register a new dependency of your gem
-  # spec.add_dependency "example-gem", "~> 1.0"
+  spec.add_dependency "hexapdf"
 
   # For more information and examples about making a new gem, check out our
   # guide at: https://guides.rubygems.org/make-your-own-gem/
