@@ -2,10 +2,10 @@
 
 [← User Guide](README.md)
 
-Use `generated_pdf` when an assertion needs to inspect the PDF document:
+Use `generated_pdf` when a test needs to inspect the PDF document:
 
 ```ruby
-assert "the document has six pages" do
+test "The document has six pages" do
   generated_pdf do
     fail "Expected six pages, found #{pages.count}" unless pages.count == 6
   end
@@ -13,10 +13,9 @@ end
 ```
 
 Inside the block, HexaPDF document methods such as `pages` are available along
-with assertion helpers such as `fail`, `log`, and `pdf_path`. The block is
-evaluated only after the fixture has been compiled. LatexTesting declares
-HexaPDF as a runtime dependency and loads it when `generated_pdf` is first
-used.
+with test helpers such as `fail`, `log`, and `pdf_path`. The block is evaluated
+only after the fixture has been compiled. LatexTesting declares HexaPDF as a
+runtime dependency and loads it when `generated_pdf` is first used.
 
 `pages` is a collection proxy: indexing and enumeration return page proxies
 that forward HexaPDF page methods and add:
@@ -35,7 +34,7 @@ normalized components as an array and also exposes `color_space` and
 `components`. For a required unique match, use `single` with a predicate:
 
 ```ruby
-assert "the header is 5 mm from the top of page 1" do
+test "The header is 5 mm from the top of page 1" do
   generated_pdf do
     page = pages[0]
     header = page.frames.single { |frame| frame.color == [0.75, 0, 0] }
@@ -53,6 +52,6 @@ butt caps, consistent widths, and no scaling or rotation. Unsupported or
 ambiguous stroke geometry fails explicitly; the API does not claim that PDF
 content streams contain semantic frame objects.
 
-Use `pdf_path` directly if an assertion needs to pass the generated file to
-another tool. The runner copies the PDF to the test's output directory before
-assertions run, so the path remains available after the test completes.
+Use `pdf_path` directly if a test needs to pass the generated file to another
+tool. The runner copies the PDF to the fixture's output directory before its
+tests run, so the path remains available after the test completes.

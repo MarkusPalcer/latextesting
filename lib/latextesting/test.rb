@@ -1,126 +1,60 @@
 # frozen_string_literal: true
 
 module LatexTesting
+  # Represents one named fact checked against a compiled fixture.
   class Test
-    attr_reader :name, :result, :failure_message
+    attr_reader :name, :fixture, :result, :failure_message
 
-    def initialize(name, output_dir:, input_dir:)
+    def initialize(name, fixture:, block:, manual: false)
       @name = name.to_s
-      @output_dir = output_dir
-      @input_dir = input_dir
-      @file = nil
-      @expect_compilation_failure = false
-      @assertions = []
-      @output_pdf_path = File.join(@output_dir, "#{@name}.pdf")
+      @fixture = fixture
+      @block = block
+      @manual = manual
       @result = nil
       @failure_message = nil
     end
 
-    def assert(name = nil, &block)
-      raise "assertion called without code block" unless block_given?
-
-      @assertions << Assertion.new(@file, name, block)
-    end
-
-    def user_assert(message)
-      assert("User assertion") { user_assert(message) }
-    end
-
-    def file(value)
-      @file = value
-    end
-
-    def expect_compilation_failure
-      @expect_compilation_failure = true
-    end
-
-    def requires_log(snippet)
-      assert "Log contains '#{snippet}'" do
-        fail "Not found" unless log.include? snippet
-      end
-    end
-
-    def execute(options = {})
+    def execute(execution)
       print "    #{@name} - "
-      begin
-        @result = nil
-        @failure_message = nil
-        raise "no .tex file given" unless @file
+      @result = nil
+      @failure_message = nil
+      report_result(execute_block(execution))
+      true
+    rescue StandardError => e
+      message = @manual ? e.message : "#{@name}: #{e.message}"
+      fail(message, prefix: false)
+    end
 
-        file = Pathname.new(@input_dir).join(@file).to_s
-        raise "#{@file} not found" unless File.file?(file)
-
-        skipped_manual_assertions = 0
-        manual_tests_passed = false
-        Dir.mktmpdir("latex-testing-") do |temp_dir|
-          result = run(temp_dir)
-          raise "Build did not pass" if !result && !@expect_compilation_failure
-          raise "Build passed unexpectedly" if result && @expect_compilation_failure
-
-          FileUtils.cp(temp_file(temp_dir, ".pdf"), @output_pdf_path) if result
-
-          execution = Assertion::Execution.new(
-            temp_dir,
-            @file,
-            output_pdf_path: @output_pdf_path,
-            user_interaction: options[:user_interaction]
-          )
-          @assertions.each do |assertion|
-            result = assertion.execute(temp_dir, execution: execution)
-            skipped_manual_assertions += 1 if result == :manual_test_skipped
-            manual_tests_passed ||= result == :manual_test_passed
-          end
-        end
-
-        if skipped_manual_assertions.positive?
-          @result = :manual_tests_skipped
-          puts "#{YELLOW}#{skipped_manual_assertions} MANUAL TESTS SKIPPED#{RESET}"
-        elsif manual_tests_passed
-          @result = :passed
-          puts "#{GREEN}PASSED#{RESET}"
-        else
-          @result = :passed
-          puts "#{GREEN}PASS#{RESET}"
-        end
-        true
-      rescue StandardError => e
-        @result = :failed
-        @failure_message = e.message
-        puts "#{RED}FAIL#{RESET}: #{e.message}"
-        false
-      end
+    def fail(message, prefix: true)
+      print "    #{@name} - " if prefix
+      @result = :failed
+      @failure_message = message
+      puts "#{RED}FAIL#{RESET}: #{message}"
+      false
     end
 
     private
 
-    def temp_file(temp_dir, extension)
-      file = Pathname.new(@file)
-      File.join(temp_dir, "#{file.basename.sub_ext(extension)}")
+    def execute_block(execution)
+      return execution.manual_test(@name) if @manual
+
+      execution.instance_exec(&@block)
     end
 
-    def run(temp_dir)
-      file = Pathname.new(@input_dir).join(@file).to_s
-      temp_dir = Pathname.new(temp_dir)
-      FileUtils.mkdir_p(@output_dir)
-
-      temp_pdf = temp_file(temp_dir, ".pdf")
-      temp_log = temp_file(temp_dir, ".log")
-
-      begin
-        raise "Build failed" unless build_raw file, temp_dir
-        raise "Build completed without producing a PDF" unless File.file?(temp_pdf)
-
-        true
-      rescue StandardError => e
-        log = if File.file?(temp_log)
-                File.read(temp_log)
-              else
-                "#{e.class}: #{e.message}\n#{e.backtrace&.join("\n")}"
-              end
-
-        File.write(File.join(@output_dir, "#{@name}.log"), log)
-        false
+    def report_result(result)
+      case result
+      when :manual_test_skipped
+        print_result(YELLOW, "MANUAL TEST SKIPPED", :manual_test_skipped)
+      when :manual_test_passed
+        print_result(GREEN, "PASSED", :passed)
+      else
+        print_result(GREEN, "PASS", :passed)
       end
+    end
+
+    def print_result(color, message, result)
+      @result = result
+      puts "#{color}#{message}#{RESET}"
     end
   end
 end

@@ -3,162 +3,240 @@
 require "rexml/document"
 
 RSpec.describe LatexTesting do
-  def build_test(suite, name, &definition)
-    test = suite.test(name, &definition)
-    test.define_singleton_method(:build_raw) do |_source, temp_dir|
-      File.write(File.join(temp_dir, "fixture.pdf"), "pdf")
-      File.write(File.join(temp_dir, "fixture.log"), "log")
-      true
-    end
-    test
+  before do
+    described_class.instance_variable_set(:@parsed_files, {})
+    described_class.instance_variable_set(:@fixtures, {})
   end
 
   it "has a version number" do
     expect(LatexTesting::VERSION).not_to be nil
   end
 
-  it "loads the test framework classes" do
-    expect(described_class::TestFile).to be_a(Class)
-    expect(described_class::TestSuite).to be_a(Class)
+  it "loads fixture and test classes without file or suite model classes" do
+    expect(described_class::DefinitionContext).to be_a(Class)
+    expect(described_class::Fixture).to be_a(Class)
     expect(described_class::Test).to be_a(Class)
-    expect(described_class::Assertion).to be_a(Class)
-    expect(described_class::Assertion::Execution).to be_a(Class)
+    expect(described_class.const_defined?(:TestFile, false)).to be(false)
+    expect(described_class.const_defined?(:TestSuite, false)).to be(false)
   end
 
-  it "returns the nonempty suites discovered by scan" do
-    filename = nil
-    begin
-      Dir.mktmpdir do |directory|
-        filename = File.join(directory, "sample_tests.rb")
-        File.write(filename, <<~RUBY)
-          testsuite "Suite / With: Punctuation" do
-            test "Single test?!" do
-            end
+  it "discovers fixtures across definition files without adding a file-level suite" do
+    Dir.mktmpdir do |directory|
+      File.write(File.join(directory, "fixture.tex"), "")
+      File.write(File.join(directory, "one_tests.rb"), <<~RUBY)
+        fixture "One" do
+          file "fixture.tex"
+          test "First fact" do
           end
-        RUBY
+        end
+      RUBY
+      File.write(File.join(directory, "two_tests.rb"), <<~RUBY)
+        fixture "Two" do
+          file "fixture.tex"
+          test "Second fact" do
+          end
+        end
+      RUBY
 
-        suites = described_class.scan(directory)
-        expect(suites.map(&:name)).to eq(["Suite / With: Punctuation"])
-        expect(suites.first.tests.map(&:name)).to eq(["Single test?!"])
-      end
-    ensure
-      described_class.instance_variable_get(:@files).delete(File.expand_path(filename)) if filename
+      fixtures = described_class.scan(directory)
+
+      expect(fixtures.map(&:name)).to eq(%w[One Two])
+      expect(fixtures.map { |fixture| fixture.tests.map(&:name) })
+        .to eq([["First fact"], ["Second fact"]])
     end
   end
 
-  it "runs only the requested suite or test" do
-    suite = described_class::TestSuite.new("Suite", output_dir: "out", input_dir: "test")
-    selected_test = suite.test("Selected") {}
-    other_test = suite.test("Other") {}
-
-    expect(suite).to receive(:execute).with({ out_folder: "out" })
-    described_class.run(out_folder: "out", suite: suite)
-
-    expect(selected_test).to receive(:execute).with({ out_folder: "out" })
-    expect(other_test).not_to receive(:execute)
-    described_class.run({ out_folder: "out" }, test: selected_test)
-  end
-
-  it "rejects a test outside the selected suite" do
-    suite = described_class::TestSuite.new("Suite", output_dir: "out", input_dir: "test")
-    other_suite = described_class::TestSuite.new("Other Suite", output_dir: "out", input_dir: "test")
-    test = other_suite.test("Test") {}
-
-    expect do
-      described_class.run(suite: suite, test: test)
-    end.to raise_error(ArgumentError, "test does not belong to the selected suite")
-  end
-
-  it "writes JUnit XML with failures and treats skipped manual tests as passes" do
+  it "rejects fixture names duplicated across definition files" do
     Dir.mktmpdir do |directory|
-      File.write(File.join(directory, "fixture.tex"), "")
-      suite = described_class::TestSuite.new(
-        "Suite & <group>",
-        output_dir: directory,
-        input_dir: directory
-      )
-      build_test(suite, "Manual & <check>") do
-        file "fixture.tex"
-        user_assert("The title is visible")
-      end
-      build_test(suite, "Failure") do
-        file "fixture.tex"
-        assert("expected & <text>") { fail("actual & <text>") }
-      end
+      File.write(File.join(directory, "one_tests.rb"), <<~RUBY)
+        fixture "Duplicate" do
+          file "one.tex"
+          test("First") {}
+        end
+      RUBY
+      File.write(File.join(directory, "two_tests.rb"), <<~RUBY)
+        fixture "Duplicate" do
+          file "two.tex"
+          test("Second") {}
+        end
+      RUBY
+
+      expect { described_class.scan(directory) }
+        .to raise_error(ArgumentError, /duplicate fixture name 'Duplicate'/)
+    end
+  end
+
+  it "rejects duplicate test names within a fixture" do
+    Dir.mktmpdir do |directory|
+      filename = File.join(directory, "tests.rb")
+      File.write(filename, <<~RUBY)
+        fixture "Sample" do
+          file "fixture.tex"
+          test("Same fact") {}
+          manual_test "Same fact"
+        end
+      RUBY
+
+      expect { described_class.parse_file(filename) }
+        .to raise_error(ArgumentError, /duplicate test name 'Same fact'/)
+    end
+  end
+
+  it "runs only the selected fixture or selected test" do
+    Dir.mktmpdir do |directory|
+      first = create_fixture(directory, "First")
+      selected_test = first.test("Selected") {}
+      first.test("Other") {}
+      second = create_fixture(directory, "Second")
+      second.test("Second test") {}
+
+      expect(first).to receive(:execute).with({ out_folder: "out" }, tests: first.tests)
+      expect(second).not_to receive(:execute)
+      described_class.run({ out_folder: "out" }, fixture: first)
+
+      expect(first).to receive(:execute).with({ out_folder: "out" }, tests: [selected_test])
+      expect(second).not_to receive(:execute)
+      described_class.run({ out_folder: "out" }, test: selected_test)
+    end
+  end
+
+  it "rejects a test outside the selected fixture" do
+    Dir.mktmpdir do |directory|
+      fixture = create_fixture(directory, "Fixture")
+      test = fixture.test("First") {}
+      other_fixture = create_fixture(directory, "Other")
+
+      expect do
+        described_class.run(fixture: other_fixture, test: test)
+      end.to raise_error(ArgumentError, "test does not belong to the selected fixture")
+    end
+  end
+
+  it "rejects the removed suite selector explicitly" do
+    expect { described_class.run(suite: Object.new) }
+      .to raise_error(ArgumentError, "suite selection has been removed; use fixture")
+  end
+
+  it "writes individual fixture tests to JUnit and continues after a failure" do
+    Dir.mktmpdir do |directory|
+      fixture = create_fixture(directory, "Suite & <group>")
+      fixture.manual_test("The title is visible")
+      fixture.test("Failure") { raise("actual & <text>") }
+      fixture.test("After failure") { log }
       report = File.join(directory, "reports", "testresults.xml")
 
-      expect { described_class.run({ junit_report: report }, suite: suite) }
-        .to output.to_stdout
+      expect { described_class.run({ junit_report: report }, fixture: fixture) }
+        .to output(/MANUAL TEST SKIPPED.*Failure - .*FAIL.*Failure: actual.*After failure - .*PASS/m).to_stdout
 
       document = REXML::Document.new(File.read(report))
-      suite_element = document.elements["testsuites/testsuite"]
-      test_cases = suite_element.get_elements("testcase")
+      fixture_element = document.elements["testsuites/testsuite"]
+      test_cases = fixture_element.get_elements("testcase")
       failure = test_cases[1].elements["failure"]
 
-      expect(suite_element.attributes["tests"]).to eq("2")
-      expect(suite_element.attributes["failures"]).to eq("1")
-      expect(suite_element.attributes["skipped"]).to eq("0")
-      expect(suite_element.attributes["name"]).to eq("Suite & <group>")
-      expect(document.root.attributes["tests"]).to eq("2")
-      expect(document.root.attributes["failures"]).to eq("1")
+      expect(fixture_element.attributes["tests"]).to eq("3")
+      expect(fixture_element.attributes["failures"]).to eq("1")
+      expect(fixture_element.attributes["name"]).to eq("Suite & <group>")
+      expect(document.root.attributes["tests"]).to eq("3")
       expect(test_cases.map { |test_case| test_case.attributes["name"] })
-        .to eq(["Manual & <check>", "Failure"])
+        .to eq(["The title is visible", "Failure", "After failure"])
       expect(test_cases.first.elements["skipped"]).to be_nil
-      expect(failure.attributes["message"]).to eq("expected & <text>: actual & <text>")
-      expect(failure.text).to eq("expected & <text>: actual & <text>")
+      expect(failure.attributes["message"]).to eq("Failure: actual & <text>")
+      expect(failure.text).to eq("Failure: actual & <text>")
+      expect(fixture.tests.last.result).to eq(:passed)
     end
   end
 
   it "reports only a selected test" do
     Dir.mktmpdir do |directory|
-      File.write(File.join(directory, "fixture.tex"), "")
-      suite = described_class::TestSuite.new(
-        "Suite",
-        output_dir: directory,
-        input_dir: directory
-      )
-      selected_test = build_test(suite, "Selected") do
-        file "fixture.tex"
-      end
-      build_test(suite, "Other") do
-        file "fixture.tex"
-      end
+      fixture = create_fixture(directory, "Fixture")
+      selected_test = fixture.test("Selected") { log }
+      fixture.test("Other") { log }
       report = File.join(directory, "testresults.xml")
-      File.write(report, "previous report")
 
       expect { described_class.run({ junit_report: report }, test: selected_test) }
-        .to output.to_stdout
+        .to output(/Selected.*PASS/m).to_stdout
 
       document = REXML::Document.new(File.read(report))
       test_cases = document.get_elements("testsuites/testsuite/testcase")
-      expect(test_cases.map { |test_case| test_case.attributes["name"] })
-        .to eq(["Selected"])
+      expect(test_cases.map { |test_case| test_case.attributes["name"] }).to eq(["Selected"])
     end
   end
-end
 
-RSpec.describe LatexTesting::Test do
-  def create_test(directory, name: "manual check")
-    File.write(File.join(directory, "fixture.tex"), "")
-    test = described_class.new(name, output_dir: directory, input_dir: directory)
-    test.file("fixture.tex")
-    test.define_singleton_method(:build_raw) do |_source, temp_dir|
-      File.write(File.join(temp_dir, "fixture.pdf"), "pdf")
-      File.write(File.join(temp_dir, "fixture.log"), "log")
-      true
-    end
-    test
-  end
-
-  it "reads the log and opens the PDF only once across assertions" do
+  it "marks every test in a fixture failed when the build fails" do
     Dir.mktmpdir do |directory|
-      File.write(File.join(directory, "fixture.tex"), "")
-      test = described_class.new("cache check", output_dir: directory, input_dir: directory)
-      test.file("fixture.tex")
-      test.define_singleton_method(:build_raw) do |_source, temp_dir|
-        File.write(File.join(temp_dir, "fixture.pdf"), "pdf")
-        File.write(File.join(temp_dir, "fixture.log"), "log")
-        true
+      fixture = create_fixture(directory, "Build failure")
+      fixture.test("First") {}
+      fixture.test("Second") {}
+      allow(fixture).to receive(:build_raw).and_return(false)
+
+      expect { expect(fixture.execute).to be(false) }
+        .to output(/First - .*FAIL.*Build did not pass.*Second - .*FAIL.*Build did not pass/m)
+        .to_stdout
+      expect(fixture.tests.map(&:result)).to eq(%i[failed failed])
+    end
+  end
+
+  it "runs named log tests after an expected compilation failure" do
+    Dir.mktmpdir do |directory|
+      fixture = create_fixture(directory, "Expected failure")
+      fixture.expect_compilation_failure
+      fixture.requires_log("expected diagnostic")
+      fixture.define_singleton_method(:build_raw) do |_source, temp_dir|
+        File.write(File.join(temp_dir, "fixture.log"), "expected diagnostic")
+        false
+      end
+
+      expect { expect(fixture.execute).to be(true) }
+        .to output(/Log contains 'expected diagnostic'.*PASS/m).to_stdout
+      expect(fixture.tests.first.result).to eq(:passed)
+    end
+  end
+
+  it "fails all fixture tests when compilation succeeds unexpectedly" do
+    Dir.mktmpdir do |directory|
+      fixture = create_fixture(directory, "Unexpected success")
+      fixture.expect_compilation_failure
+      fixture.test("First") {}
+      fixture.test("Second") {}
+
+      expect { expect(fixture.execute).to be(false) }
+        .to output(/First - .*FAIL.*Build passed unexpectedly.*Second - .*FAIL.*Build passed unexpectedly/m)
+        .to_stdout
+      expect(fixture.tests.map(&:result)).to eq(%i[failed failed])
+    end
+  end
+
+  it "does not reuse a previous PDF after an expected failed build" do
+    Dir.mktmpdir do |directory|
+      fixture = create_fixture(directory, "Stale PDF")
+      fixture.manual_test("The output PDF exists")
+
+      expect { expect(fixture.execute).to be(true) }
+        .to output(/MANUAL TEST SKIPPED/).to_stdout
+      expect(File.file?(File.join(directory, "fixture.pdf"))).to be(true)
+
+      fixture.expect_compilation_failure
+      allow(fixture).to receive(:build_raw) do |_source, temp_dir|
+        File.write(File.join(temp_dir, "fixture.log"), "expected failure")
+        false
+      end
+
+      expect { expect(fixture.execute).to be(false) }
+        .to output(/No PDF file produced by LaTeX build/).to_stdout
+      expect(File.file?(File.join(directory, "fixture.pdf"))).to be(false)
+    end
+  end
+
+  it "shares the cached log and PDF execution across named tests" do
+    Dir.mktmpdir do |directory|
+      fixture = create_fixture(directory, "Cache check")
+      fixture.test("First") do
+        log
+        generated_pdf { pdf_path }
+      end
+      fixture.test("Second") do
+        log
+        generated_pdf { pdf_path }
       end
 
       document_class = Class.new do
@@ -171,140 +249,69 @@ RSpec.describe LatexTesting::Test do
       stub_const("HexaPDF", hexa_pdf)
       allow_any_instance_of(LatexTesting::Assertion::Execution)
         .to receive(:require).with("hexapdf")
-      expect(document_class).to receive(:open)
-        .with(File.join(directory, "cache check.pdf")).once.and_call_original
+      expect(document_class).to receive(:open).once.and_call_original
+      expect(fixture).to receive(:build_raw).once.and_call_original
       expect(File).to receive(:read)
         .with(a_string_matching(/fixture\.log\z/)).once.and_call_original
 
-      test.instance_eval do
-        2.times do
-          assert("reads cached resources") do
-            log
-            generated_pdf { pdf_path }
-          end
-        end
-      end
-
-      expect(test.execute).to be(true)
+      expect { expect(fixture.execute).to be(true) }
+        .to output(/First - .*PASS.*Second - .*PASS/m).to_stdout
     end
   end
 
-  it "marks manual assertions as skipped without prompting by default" do
+  it "runs manual tests interactively and fails when the user rejects one" do
     Dir.mktmpdir do |directory|
-      test = create_test(directory)
-      test.instance_eval { user_assert("The title is visible") }
-
-      expect($stdin).not_to receive(:gets)
-      expected_output =
-        "    manual check - #{LatexTesting::YELLOW}1 MANUAL TESTS SKIPPED#{LatexTesting::RESET}\n"
-      expect { expect(test.execute).to be(true) }
-        .to output(expected_output).to_stdout
-    end
-  end
-
-  it "counts skipped manual assertions in the test result" do
-    Dir.mktmpdir do |directory|
-      test = create_test(directory)
-      test.instance_eval do
-        user_assert("The title is visible")
-        user_assert("The footer is visible")
-      end
-      expected_output =
-        "    manual check - #{LatexTesting::YELLOW}2 MANUAL TESTS SKIPPED#{LatexTesting::RESET}\n"
-
-      expect { expect(test.execute).to be(true) }
-        .to output(expected_output).to_stdout
-    end
-  end
-
-  it "fails a skipped manual assertion if the PDF was not copied" do
-    Dir.mktmpdir do |directory|
-      test = create_test(directory)
-      test.instance_eval { user_assert("The title is visible") }
-      allow(FileUtils).to receive(:cp)
-
-      expect { expect(test.execute).to be(false) }
-        .to output(/FAIL.*No PDF file produced by LaTeX build/)
-        .to_stdout
-    end
-  end
-
-  it "copies the PDF before prompting for a manual assertion" do
-    Dir.mktmpdir do |directory|
-      test = create_test(directory)
-      test.instance_eval { user_assert("The title is visible") }
-      output_pdf = File.join(directory, "manual check.pdf")
-      allow($stdin).to receive(:gets) do
-        expect(File.file?(output_pdf)).to be(true)
-        "yes\n"
-      end
-
-      expected_output = [
-        "    manual check - The title is visible",
-        "PDF: #{output_pdf}",
-        "Does this assertion pass? [yes/no] ",
-        "#{LatexTesting::GREEN}PASSED#{LatexTesting::RESET}"
-      ].join("\n") + "\n"
-
-      expect { expect(LatexTesting.run({ user_interaction: true }, test: test)).to be(true) }
-        .to output(expected_output)
-        .to_stdout
-    end
-  end
-
-  it "fails when a user rejects a manual assertion" do
-    Dir.mktmpdir do |directory|
-      test = create_test(directory)
-      test.instance_eval { user_assert("The title is visible") }
+      fixture = create_fixture(directory, "Manual")
+      fixture.manual_test("The title is visible")
       allow($stdin).to receive(:gets).and_return("no\n")
 
-      expect { expect(test.execute(user_interaction: true)).to be(false) }
-        .to output(/FAIL.*User assertion rejected: The title is visible/)
-        .to_stdout
+      expect do
+        expect(fixture.execute(user_interaction: true)).to be(false)
+      end.to output(
+        /The title is visible - PDF: .*fixture\.pdf.*Does this test pass\?.*FAIL.*Manual test rejected/m
+      ).to_stdout
     end
   end
 
-  it "accepts y as confirmation" do
-    Dir.mktmpdir do |directory|
-      test = create_test(directory)
-      test.instance_eval { user_assert("The title is visible") }
-      allow($stdin).to receive(:gets).and_return("y\n")
-
-      expect { expect(test.execute(user_interaction: true)).to be(true) }
-        .to output(/PASSED/).to_stdout
+  def create_fixture(directory, name)
+    File.write(File.join(directory, "fixture.tex"), "")
+    fixture = LatexTesting::Fixture.new(
+      name,
+      output_dir: directory,
+      input_dir: directory,
+      definition_file: File.join(directory, "tests.rb")
+    )
+    fixture.file("fixture.tex")
+    fixture.define_singleton_method(:build_raw) do |_source, temp_dir|
+      File.write(File.join(temp_dir, "fixture.pdf"), "pdf")
+      File.write(File.join(temp_dir, "fixture.log"), "log")
+      true
     end
+    fixture
   end
+end
 
-  it "rejects n as denial" do
+RSpec.describe LatexTesting::Test do
+  it "marks a skipped manual test as a passing result and requires a PDF" do
     Dir.mktmpdir do |directory|
-      test = create_test(directory)
-      test.instance_eval { user_assert("The title is visible") }
-      allow($stdin).to receive(:gets).and_return("n\n")
+      File.write(File.join(directory, "fixture.tex"), "")
+      fixture = LatexTesting::Fixture.new(
+        "Manual",
+        output_dir: directory,
+        input_dir: directory,
+        definition_file: File.join(directory, "tests.rb")
+      )
+      fixture.file("fixture.tex")
+      test = fixture.manual_test("The title is visible")
+      fixture.define_singleton_method(:build_raw) do |_source, temp_dir|
+        File.write(File.join(temp_dir, "fixture.pdf"), "pdf")
+        File.write(File.join(temp_dir, "fixture.log"), "log")
+        true
+      end
 
-      expect { expect(test.execute(user_interaction: true)).to be(false) }
-        .to output(/FAIL.*User assertion rejected: The title is visible/)
-        .to_stdout
-    end
-  end
-
-  it "retries invalid responses and accepts yes case-insensitively" do
-    Dir.mktmpdir do |directory|
-      test = create_test(directory)
-      test.instance_eval { user_assert("The title is visible") }
-      expect($stdin).to receive(:gets).twice.and_return("maybe\n", "YES\n")
-
-      expect { expect(test.execute(user_interaction: true)).to be(true) }
-        .to output(/PASS/).to_stdout
-    end
-  end
-
-  it "does not mark tests without manual assertions as skipped" do
-    Dir.mktmpdir do |directory|
-      test = create_test(directory)
-
-      expect($stdin).not_to receive(:gets)
-      expect { expect(test.execute).to be(true) }
-        .to output(/PASS/).to_stdout
+      expect { expect(fixture.execute).to be(true) }
+        .to output(/The title is visible.*MANUAL TEST SKIPPED/m).to_stdout
+      expect(test.result).to eq(:manual_test_skipped)
     end
   end
 end

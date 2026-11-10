@@ -16,36 +16,35 @@ public runner methods:
 ```ruby
 require "latextesting"
 
-test_suites = LatexTesting.scan("test")
+fixtures = LatexTesting.scan("test")
 LatexTesting.run
 ```
 
-`scan` recursively discovers recognized definition files and returns each
-nonempty suite. Pass one of those suites to `run` to execute just that suite,
-or pass one of its tests to execute a single test:
+`scan` recursively discovers recognized definition files and returns fixtures.
+Pass a fixture to `run` to execute all of its tests, or pass one of its tests
+to run just that test (the fixture is still compiled):
 
 ```ruby
-LatexTesting.run(suite: test_suites.first)
-LatexTesting.run(test: test_suites.first.tests.first)
+LatexTesting.run(fixture: fixtures.first)
+LatexTesting.run(test: fixtures.first.tests.first)
 ```
 
-Pass an options hash to enable manual visual assertions or write a JUnit XML
-report:
+Pass options to enable manual visual tests or write a JUnit XML report:
 
 ```ruby
 LatexTesting.run(user_interaction: true)
 LatexTesting.run(junit_report: "out/testresults.xml")
 ```
 
-With the default options, tests containing `user_assert` print the number of
-skipped assertions in yellow before `MANUAL TESTS SKIPPED` (for example,
-`2 MANUAL TESTS SKIPPED`) and count as passed. Interactive runs show the
-assertion and PDF path and prompt for `yes`/`y` or `no`/`n`. A yes response
-prints `PASSED`; a no response fails the test.
+Manual tests are skipped by default and count as passed in the XML report.
+Interactive runs show each test description and the persistent PDF path, then
+prompt for `yes`/`y` or `no`/`n`. A yes response prints `PASSED`; a no
+response fails that test. A fixture build failure or unexpected compilation
+result fails its selected tests; a failed test does not stop later tests.
 
 When `junit_report` is set to a filename, each run overwrites that file with a
-JUnit XML report containing only the tests executed in that run. Failed tests
-are reported as failures; tests with skipped manual assertions count as passed.
+JUnit XML report containing only the tests executed in that run. JUnit
+`<testsuite>` elements represent fixtures.
 
-To load one particular definition file instead, use
-`LatexTesting.parse_file` and then call `LatexTesting.run`.
+To load one particular definition file instead, use `LatexTesting.parse_file`
+and then call `LatexTesting.run`.

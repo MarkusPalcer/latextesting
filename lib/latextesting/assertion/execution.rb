@@ -2,6 +2,7 @@
 
 module LatexTesting
   class Assertion
+    # Shares log and PDF access across the tests of one compiled fixture.
     class Execution
       def initialize(temp_dir, file, output_pdf_path: nil, user_interaction: false)
         @temp_dir = temp_dir
@@ -28,27 +29,42 @@ module LatexTesting
         path
       end
 
-      def user_assert(message)
+      def manual_test(message)
         path = pdf_path
         return :manual_test_skipped unless @user_interaction
 
-        puts message
         puts "PDF: #{path}"
+        prompt_manual_test(message)
+      end
 
+      private
+
+      def prompt_manual_test(message)
         loop do
-          print "Does this assertion pass? [yes/no] "
+          print "Does this test pass? [yes/no] "
           response = $stdin.gets
-          raise "No response received for user assertion" if response.nil?
+          raise "No response received for manual test" if response.nil?
+
           puts
 
-          case response.strip.downcase
-          when "yes", "y"
-            return :manual_test_passed
-          when "no", "n"
-            raise "User assertion rejected: #{message}"
-          end
+          return manual_test_result(response, message) if manual_test_answer?(response)
         end
       end
+
+      def manual_test_answer?(response)
+        %w[yes y no n].include?(response.strip.downcase)
+      end
+
+      def manual_test_result(response, message)
+        case response.strip.downcase
+        when "yes", "y"
+          :manual_test_passed
+        when "no", "n"
+          raise "Manual test rejected: #{message}"
+        end
+      end
+
+      public
 
       def generated_pdf(&block)
         raise "generated_pdf called without code block" unless block_given?
@@ -66,7 +82,7 @@ module LatexTesting
 
       def temp_file(extension)
         file = Pathname.new(@file)
-        File.join(@temp_dir, "#{file.basename.sub_ext(extension)}")
+        File.join(@temp_dir, file.basename.sub_ext(extension))
       end
     end
   end

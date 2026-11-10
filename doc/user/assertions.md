@@ -1,77 +1,76 @@
-# Assertions
+# Tests
 
 [← User Guide](README.md)
 
-## Summary
+## Test declarations
 
-| Assertion | Explanation |
+| Declaration | Explanation |
 |---|---|
-| `requires_log` | Checks the log for expected text |
-| `assert` | Runs a custom assertion block |
-| `user_assert` | Records one visual expectation |
+| `test(name) { ... }` | Runs a custom check as one named test |
+| `manual_test(description)` | Records one manual visual test |
+| `requires_log(substring)` | Defines a named test that checks the log |
 
-## Log assertions
+## Log tests
 
-Use `requires_log` for a simple substring check:
+Use `requires_log` for a simple substring check. The generated test name
+describes the expected log text:
 
 ```ruby
-test "Reports a missing command" do
+fixture "Missing command diagnostic" do
   file "missing-command.tex"
   expect_compilation_failure
   requires_log "Undefined control sequence"
 end
 ```
 
-## Custom assertions
+## Automated tests
 
-Use `assert(name = nil) { ... }` when the check needs custom logic or a clearer
-failure message:
+Use `test(name) { ... }` when a check needs custom logic or a clearer failure
+message. Each call creates an individually reported test:
 
 ```ruby
-test "Reports the conflicting field" do
+fixture "Conflicting field diagnostic" do
   file "field-conflict.tex"
   expect_compilation_failure
 
-  assert "names the existing field" do
+  test "The log names the existing field" do
     expected = "existing field name."
     fail "Expected diagnostic was not found" unless log.include?(expected)
   end
 end
 ```
 
-### Assertion block helpers
+### Test block helpers
 
-The assertion block provides:
+The test block provides:
 
 - `log` — the current fixture's LaTeX log as a string.
-- `pdf_path` — the persistent path to the generated PDF in the test output
-  directory.
+- `pdf_path` — the persistent path to the generated PDF.
 - `generated_pdf { ... }` — access to the PDF document API.
-- `fail(message)` — marks the assertion as failed with the given message.
+- `fail(message)` — marks this test as failed with the given message.
 
-Local variables from the surrounding test definition can be used inside an
-assertion block. The test stops at the first failed assertion.
+Local variables from the surrounding fixture definition can be used inside a
+test block. Each test runs independently; failures do not stop later tests for
+the fixture.
 
-## Manual visual assertions
+## Manual visual tests
 
-Use `user_assert "fact to check"` in the test definition for a visual check.
-Each call should describe one fact so the result can be assessed separately:
+Use `manual_test "fact to check"` in a fixture for a visual check. Each call
+defines a separately reported test and should describe one fact:
 
 ```ruby
-test "Renders a character panel" do
+fixture "Character panel" do
   file "character-panel.tex"
-  user_assert 'The panel title is "Character".'
-  user_assert "The panel shows the character name."
-  user_assert "The weapon appears inside the panel."
+  manual_test 'The panel title is "Character".'
+  manual_test "The panel shows the character name."
+  manual_test "The weapon appears inside the panel."
 end
 ```
 
-By default, manual assertions are not prompted. Their skipped count is printed
-in yellow before `MANUAL TESTS SKIPPED`, for example `2 MANUAL TESTS SKIPPED`.
-Tests without any `user_assert` continue to print `PASS`. A `user_assert` still
-fails if its generated PDF is missing, even when manual interaction is disabled.
-To enable interaction, call the runner with
-`LatexTesting.run(user_interaction: true)`. LatexTesting shows the assertion
-text and persistent PDF path, then asks for `yes`/`y` or `no`/`n`; answers are
-case-insensitive, invalid answers are re-prompted, acceptance reports
-`PASSED`, and rejection fails the test.
+By default, manual tests are not prompted and report `MANUAL TEST SKIPPED`.
+They count as passing in JUnit but fail if the generated PDF is missing. To
+enable interaction, call the runner with
+`LatexTesting.run(user_interaction: true)`. LatexTesting shows the test
+description and persistent PDF path, then asks for `yes`/`y` or `no`/`n`;
+answers are case-insensitive, invalid answers are re-prompted, acceptance
+reports `PASSED`, and rejection fails that test.

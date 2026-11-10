@@ -3,7 +3,7 @@
 [← User Guide](README.md)
 
 LatexTesting runs test definitions in a host Ruby project. A definition file
-and its LaTeX fixture are commonly kept together under the host's test
+and its LaTeX fixtures are commonly kept together under the host's test
 directory.
 
 Create `test/unit/example/hello.tex`:
@@ -18,21 +18,21 @@ Hello, LaTeX!
 Create `test/unit/example/tests.rb`:
 
 ```ruby
-testsuite "Example" do
-  test "Hello document has one page" do
-    file "hello.tex"
+fixture "Hello document" do
+  file "hello.tex"
 
-    assert "the PDF has one page" do
-      generated_pdf do
-        fail "Expected one page, found #{pages.count}" unless pages.count == 1
-      end
+  test "The PDF has one page" do
+    generated_pdf do
+      fail "Expected one page, found #{pages.count}" unless pages.count == 1
     end
   end
 end
 ```
 
-The fixture path is relative to `tests.rb`. The `assert` block can use
-`generated_pdf` to inspect the compiled document through HexaPDF.
+The `.tex` path is relative to `tests.rb`. The named test block can use
+`generated_pdf` to inspect the compiled document through HexaPDF. Each
+definition file may declare many fixtures; their names must be unique across
+the project.
 
 Run the definition with the host project's configured test command. See
 [Running Tests](running-tests.md) for the public runner API.
