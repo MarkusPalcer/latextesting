@@ -13,8 +13,6 @@ module LatexTesting
         @file = file
         @output_pdf_path = output_pdf_path
         @user_interaction = user_interaction
-        @log = nil
-        @generated_pdf = nil
       end
 
       def log
@@ -71,12 +69,10 @@ module LatexTesting
       public
 
       def generated_pdf
-        require "hexapdf"
-        @generated_pdf ||= PDFExecution.new(self, HexaPDF::Document.open(pdf_path))
-      end
-
-      def fail(message)
-        raise message
+        @generated_pdf ||= begin
+          require "hexapdf"
+          PDFExecution.new(self, HexaPDF::Document.open(pdf_path))
+        end
       end
 
       private

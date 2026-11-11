@@ -10,13 +10,10 @@ module LatexTesting
       @fixture = fixture
       @block = block
       @manual = manual
-      @result = nil
-      @failure_message = nil
     end
 
     def execute(execution)
       print "    #{@name} - "
-      @result = nil
       @failure_message = nil
       report_result(execute_block(execution))
       true

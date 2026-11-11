@@ -10,10 +10,9 @@ module LatexTesting
       @output_dir = output_dir
       @input_dir = input_dir
       @definition_file = definition_file
-      @file = nil
       @expect_compilation_failure = false
       @tests = []
-      @test_names = {}
+      @test_names = []
       @output_pdf_path = File.join(File.dirname(@output_dir), "#{@name}.pdf")
     end
 
@@ -55,10 +54,10 @@ module LatexTesting
 
     def add_test(name, block: nil, manual: false)
       name = name.to_s
-      raise ArgumentError, "duplicate test name '#{name}' in fixture '#{@name}'" if @test_names.key?(name)
+      raise ArgumentError, "duplicate test name '#{name}' in fixture '#{@name}'" if @test_names.include?(name)
 
       test = Test.new(name, fixture: self, block: block, manual: manual)
-      @test_names[name] = true
+      @test_names << name
       @tests << test
       test
     end

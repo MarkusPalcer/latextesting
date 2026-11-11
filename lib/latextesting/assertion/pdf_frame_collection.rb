@@ -14,8 +14,6 @@ module LatexTesting
           end
 
           def each(&block)
-            return enum_for(__method__) unless block
-
             @frames.each(&block)
           end
 

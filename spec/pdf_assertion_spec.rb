@@ -4,6 +4,17 @@ require "latextesting"
 require "hexapdf"
 
 module PDFAssertionSpecHelpers
+  FRAME_MUTANT_SUBJECTS = [
+    "LatexTesting::Assertion::Execution::PDFExecution::Page#frames",
+    "LatexTesting::Assertion::Execution::PDFExecution::Page#extract_frames",
+    "LatexTesting::Assertion::Execution::PDFExecution::FrameExtractor*",
+    "LatexTesting::Assertion::Execution::PDFExecution::FramePartitioner*",
+    "LatexTesting::Assertion::Execution::PDFExecution::FrameGeometry*",
+    "LatexTesting::Assertion::Execution::PDFExecution::FrameCollection*",
+    "LatexTesting::Assertion::Execution::PDFExecution::Frame*",
+    "LatexTesting::Assertion::Execution::PDFExecution::FrameProcessor*"
+  ].freeze
+
   def draw_frame(page, bounds, color: [0.75, 0, 0], width: 2, cap: :butt)
     canvas = page.canvas
     canvas.stroke_color(*color).line_width(width).line_cap_style(cap)
@@ -35,6 +46,7 @@ RSpec.describe LatexTesting::Assertion::Execution::PDFExecution::PageCollection 
     collection = described_class.new(HexaPDF::Document.new.pages)
 
     expect(collection.add).to be_a(LatexTesting::Assertion::Execution::PDFExecution::Page)
+    expect(collection[0]).to be_a(LatexTesting::Assertion::Execution::PDFExecution::Page)
     expect(collection.count).to eq(1)
     expect(collection.first.box(:media).width).to be_positive
     expect(collection.each_with_index.map { |_page, index| index }).to eq([0])
@@ -58,11 +70,15 @@ end
 RSpec.describe "PDF frame extraction" do
   include PDFAssertionSpecHelpers
 
-  it "extracts immutable frames with visible bounds and caches them" do
+  it "extracts immutable frames with visible bounds and caches them",
+     mutant_expression: PDFAssertionSpecHelpers::FRAME_MUTANT_SUBJECTS do
     page = HexaPDF::Document.new.pages.add
     draw_frame(page, [10, 20, 90, 100])
     proxy = proxy_for(page)
     expect(page).to receive(:contents).once.and_call_original
+    expect(proxy).to receive(:require).with("hexapdf").and_return(true)
+    expect(proxy).to receive(:require_relative).with("pdf_frame_processor").and_return(true)
+    expect(proxy).to receive(:require_relative).with("pdf_frame_extractor").and_return(true)
 
     frames = proxy.frames
     frame = frames.single { |candidate| candidate.color == [0.75, 0, 0] }
@@ -83,7 +99,13 @@ end
 RSpec.describe "PDF frame matching" do
   include PDFAssertionSpecHelpers
 
-  it "recognizes multiple same-color frames and requires unique single matches" do
+  it "recognizes multiple same-color frames and requires unique single matches",
+     mutant_expression: [
+       "LatexTesting::Assertion::Execution::PDFExecution::FrameCollection*",
+       "LatexTesting::Assertion::Execution::PDFExecution::FrameExtractor*",
+       "LatexTesting::Assertion::Execution::PDFExecution::FramePartitioner*",
+       "LatexTesting::Assertion::Execution::PDFExecution::FrameGeometry*"
+     ] do
     page = HexaPDF::Document.new.pages.add
     draw_frame(page, [10, 10, 30, 30])
     draw_frame(page, [50, 50, 80, 80])
@@ -101,7 +123,15 @@ end
 RSpec.describe "Ambiguous PDF frame geometry" do
   include PDFAssertionSpecHelpers
 
-  it "rejects strokes that can be partitioned into frames in multiple ways" do
+  it "rejects strokes that can be partitioned into frames in multiple ways",
+     mutant_expression: [
+       "LatexTesting::Assertion::Execution::PDFExecution::Page#frames",
+       "LatexTesting::Assertion::Execution::PDFExecution::Page#extract_frames",
+       "LatexTesting::Assertion::Execution::PDFExecution::FrameExtractor*",
+       "LatexTesting::Assertion::Execution::PDFExecution::FramePartitioner*",
+       "LatexTesting::Assertion::Execution::PDFExecution::FrameGeometry*",
+       "LatexTesting::Assertion::Execution::PDFExecution::FrameProcessor*"
+     ] do
     page = HexaPDF::Document.new.pages.add
     2.times { draw_frame(page, [10, 10, 30, 30]) }
 
@@ -113,7 +143,12 @@ end
 RSpec.describe "Unsupported PDF frame geometry" do
   include PDFAssertionSpecHelpers
 
-  it "rejects curved, transformed, and non-butt strokes" do
+  it "rejects curved, transformed, and non-butt strokes",
+     mutant_expression: [
+       "LatexTesting::Assertion::Execution::PDFExecution::Page#extract_frames",
+       "LatexTesting::Assertion::Execution::PDFExecution::FrameExtractor*",
+       "LatexTesting::Assertion::Execution::PDFExecution::FrameProcessor*"
+     ] do
     curved_page = HexaPDF::Document.new.pages.add
     curved_page.canvas.move_to(0, 0).curve_to(10, 0, p1: [3, 5], p2: [7, 5]).stroke
     expect { proxy_for(curved_page).frames }.to raise_error(/Unsupported frame path/)

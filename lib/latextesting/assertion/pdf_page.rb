@@ -23,13 +23,11 @@ module LatexTesting
 
           def initialize(page)
             @page = page
-            @boundary = nil
-            @frames = nil
           end
 
           def boundary
             @boundary ||= begin
-              box = @page.box(:media)
+              box = box(:media)
               Boundary.new(left: box.left, bottom: box.bottom, right: box.right, top: box.top)
             end
           end
@@ -43,27 +41,31 @@ module LatexTesting
               raise ArgumentError, "value and target unit must be numeric"
             end
 
-            value * (@page[:UserUnit] || 1) * target_unit
+            value * (self[:UserUnit] || 1) * target_unit
           end
 
           def method_missing(name, *arguments, **keywords, &block)
-            return super unless @page.respond_to?(name)
+            super unless delegated_method?(name, false)
 
             @page.public_send(name, *arguments, **keywords, &block)
           end
 
-          def respond_to_missing?(name, include_private = false)
-            @page.respond_to?(name, include_private) || super
+          def respond_to_missing?(name, include_private)
+            delegated_method?(name, include_private)
           end
 
           private
+
+          def delegated_method?(name, include_private)
+            @page.respond_to?(name, include_private)
+          end
 
           def extract_frames
             require "hexapdf"
             require_relative "pdf_frame_processor"
             require_relative "pdf_frame_extractor"
-            processor = FrameProcessor.new(@page.resources)
-            HexaPDF::Content::Parser.parse(@page.contents, processor)
+            processor = FrameProcessor.new(resources)
+            HexaPDF::Content::Parser.parse(contents, processor)
             FrameExtractor.new(processor.strokes).extract
           end
         end

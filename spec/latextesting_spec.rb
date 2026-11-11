@@ -97,6 +97,7 @@ RSpec.describe LatexTesting do
       expect(first).to receive(:execute).with({ out_folder: "out" }, tests: [selected_test])
       expect(second).not_to receive(:execute)
       described_class.run({ out_folder: "out" }, test: selected_test)
+
     end
   end
 

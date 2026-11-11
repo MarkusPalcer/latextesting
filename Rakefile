@@ -9,4 +9,9 @@ require "rubocop/rake_task"
 
 RuboCop::RakeTask.new
 
+desc "Run mutation testing"
+task :mutant do
+  sh "bundle", "exec", "mutant", "run", "--usage", "opensource"
+end
+
 task default: %i[spec rubocop]

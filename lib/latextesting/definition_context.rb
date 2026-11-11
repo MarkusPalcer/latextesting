@@ -35,7 +35,7 @@ module LatexTesting
     end
 
     def output_base
-      relative_path = Pathname(@filename).relative_path_from(PROJECT_ROOT).to_s
+      relative_path = Pathname(@filename).relative_path_from(PROJECT_ROOT)
 
       relative_path = relative_path.sub(/\.rb\z/, "")
       File.join(OUT_DIR, relative_path)

@@ -13,7 +13,7 @@ module LatexTesting
 
     def self.build_document(fixtures)
       document = REXML::Document.new
-      document << REXML::XMLDecl.new("1.0", "UTF-8")
+      document << REXML::XMLDecl.new(nil, "UTF-8")
       root = document.add_element("testsuites")
       all_tests = fixtures.flat_map { |fixture| fixture.fetch(:tests) }
       root.add_attributes(summary_attributes(all_tests))
@@ -23,7 +23,7 @@ module LatexTesting
     end
 
     def self.write_document(filename, document)
-      FileUtils.mkdir_p(File.dirname(filename.to_s))
+      FileUtils.mkdir_p(File.dirname(filename))
       File.open(filename, "w") do |file|
         REXML::Formatters::Default.new.write(document, file)
         file.write("\n")
@@ -59,7 +59,7 @@ module LatexTesting
     def self.add_test_case(fixture_element, fixture_name, test)
       test_element = fixture_element.add_element(
         "testcase",
-        "classname" => fixture_name.to_s,
+        "classname" => fixture_name,
         "name" => test.name
       )
       return unless test.result == :failed

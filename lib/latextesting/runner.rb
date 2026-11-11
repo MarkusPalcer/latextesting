@@ -15,9 +15,7 @@ module LatexTesting
   class << self
     def parse_file(filename)
       filename = File.expand_path(filename)
-      return @parsed_files[filename] if @parsed_files.key?(filename)
-
-      parse_new_file(filename)
+      @parsed_files.fetch(filename) { parse_new_file(filename) }
     end
 
     def register_fixture(fixture)
@@ -46,7 +44,6 @@ module LatexTesting
       end
 
       write_report(options, selected_fixtures, test)
-      nil
     end
 
     private
@@ -56,7 +53,7 @@ module LatexTesting
       @parsed_files[filename] = fixtures
 
       source = File.read(filename)
-      DefinitionContext.new(filename, fixtures).instance_eval(source, filename, 1)
+      DefinitionContext.new(filename, fixtures).instance_eval(source, filename)
 
       fixtures
     rescue StandardError
@@ -65,7 +62,7 @@ module LatexTesting
     end
 
     def rollback_parse(filename, fixtures)
-      fixtures&.each { |fixture| @fixtures.delete(fixture.name) }
+      fixtures.each { |fixture| @fixtures.delete(fixture.name) }
       @parsed_files.delete(filename)
     end
 

@@ -66,12 +66,11 @@ module LatexTesting
       end
 
       def save_failure_log(temp_log)
-        log = if temp_log && File.file?(temp_log)
+        log = if File.file?(temp_log)
                 File.read(temp_log)
               else
-                "Build failed for #{@file || @name}"
+                "Build failed for #{@file}"
               end
-        FileUtils.mkdir_p(File.dirname(@output_log_path))
         File.write(@output_log_path, log)
       end
 

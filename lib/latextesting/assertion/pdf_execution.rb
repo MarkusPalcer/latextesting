@@ -8,7 +8,6 @@ module LatexTesting
         def initialize(execution, document)
           @execution = execution
           @document = document
-          @pages = nil
         end
 
         def pages
@@ -20,10 +19,8 @@ module LatexTesting
           target.public_send(name, *arguments, **keywords, &block)
         end
 
-        def respond_to_missing?(name, include_private = false)
-          @execution.respond_to?(name, include_private) ||
-            @document.respond_to?(name, include_private) ||
-            super
+        def respond_to_missing?(name, include_private)
+          @execution.respond_to?(name, include_private) || @document.respond_to?(name, include_private)
         end
       end
     end

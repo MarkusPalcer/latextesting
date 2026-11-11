@@ -1,0 +1,12 @@
+---
+includes:
+  - lib
+requires:
+  - latextesting
+integration:
+  name: rspec
+matcher:
+  subjects:
+    - "LatexTesting*"
+  ignore:
+    - "LatexTesting::JUnitReport.write_document"

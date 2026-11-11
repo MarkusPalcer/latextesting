@@ -13,41 +13,36 @@ module LatexTesting
             @page_proxies = {}.compare_by_identity
           end
 
-          def [](*arguments)
-            wrap(@pages[*arguments])
-          end
-
           def each(&block)
-            return enum_for(__method__) unless block
+            return enum_for unless block
 
             @pages.each { |page| block.call(wrap(page)) }
             self
           end
 
-          def length
-            @pages.length
-          end
-          alias size length
-
           def method_missing(name, *arguments, **keywords, &block)
-            return super unless @pages.respond_to?(name)
+            super unless delegated_method?(name, false)
 
             wrap(@pages.public_send(name, *arguments, **keywords, &block))
           end
 
-          def respond_to_missing?(name, include_private = false)
-            @pages.respond_to?(name, include_private) || super
+          def respond_to_missing?(name, include_private)
+            delegated_method?(name, include_private)
           end
 
           private
+
+          def delegated_method?(name, include_private)
+            @pages.respond_to?(name, include_private)
+          end
 
           def wrap(page)
             case page
             when Array
               page.map { |item| wrap(item) }
-            when nil
-              nil
             else
+              return page unless page.respond_to?(:box)
+
               @page_proxies[page] ||= Page.new(page)
             end
           end
