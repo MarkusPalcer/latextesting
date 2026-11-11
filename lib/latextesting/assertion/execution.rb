@@ -10,7 +10,7 @@ module LatexTesting
         @output_pdf_path = output_pdf_path
         @user_interaction = user_interaction
         @log = nil
-        @pdf_execution = nil
+        @generated_pdf = nil
       end
 
       def log
@@ -66,12 +66,9 @@ module LatexTesting
 
       public
 
-      def generated_pdf(&block)
-        raise "generated_pdf called without code block" unless block_given?
-
+      def generated_pdf
         require "hexapdf"
-        @pdf_execution ||= PDFExecution.new(self, HexaPDF::Document.open(pdf_path))
-        @pdf_execution.instance_exec(&block)
+        @generated_pdf ||= PDFExecution.new(self, HexaPDF::Document.open(pdf_path))
       end
 
       def fail(message)

@@ -232,18 +232,15 @@ RSpec.describe LatexTesting do
       fixture = create_fixture(directory, "Cache check")
       fixture.test("First") do
         log
-        generated_pdf { pdf_path }
+        generated_pdf.pages.count
       end
       fixture.test("Second") do
         log
-        generated_pdf { pdf_path }
+        generated_pdf.pages.count
       end
 
-      document_class = Class.new do
-        def self.open(_path)
-          Object.new
-        end
-      end
+      document_class = Class.new
+      document_class.define_singleton_method(:open) { |_path| Struct.new(:pages).new([]) }
       hexa_pdf = Module.new
       hexa_pdf.const_set(:Document, document_class)
       stub_const("HexaPDF", hexa_pdf)

@@ -16,9 +16,7 @@ fixture "Hello document" do
   file "fixture.tex"
 
   test "The PDF has one page" do
-    generated_pdf do
-      fail "Expected one page, found #{pages.count}" unless pages.count == 1
-    end
+    fail "Expected one page, found #{generated_pdf.pages.count}" unless generated_pdf.pages.count == 1
   end
 
   manual_test "The title is visible on the page."

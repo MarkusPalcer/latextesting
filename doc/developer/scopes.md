@@ -10,7 +10,6 @@ shows the objects that receive each block:
 | Definition file source | `LatexTesting::DefinitionContext` |
 | `fixture` block | `LatexTesting::Fixture` |
 | `test` block | `LatexTesting::Assertion::Execution` |
-| `generated_pdf` block | `LatexTesting::Assertion::Execution::PDFExecution` |
 
 `LatexTesting.parse_file` evaluates source with
 `DefinitionContext#instance_eval`. Fixture declaration blocks use
@@ -19,10 +18,10 @@ shows the objects that receive each block:
 while retaining captured local variables. `manual_test` and `requires_log`
 declare named tests on the fixture.
 
-The PDF wrapper implements `method_missing` and `respond_to_missing?`. It
-forwards public methods to the assertion execution object when available, and
-otherwise to the HexaPDF document. This lets one test block use PDF operations
-and test helpers without introducing a second DSL.
+`generated_pdf` returns a PDF wrapper that implements `method_missing` and
+`respond_to_missing?`. It forwards public methods to the assertion execution
+object when available, and otherwise to the HexaPDF document. This lets a test
+use PDF operations and test helpers without introducing a second DSL.
 
 Resource state lives on `Assertion::Execution`. `Fixture#execute` creates one
 execution context for a compiled fixture and passes it to each named test.

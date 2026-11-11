@@ -46,7 +46,7 @@ The test block provides:
 
 - `log` — the current fixture's LaTeX log as a string.
 - `pdf_path` — the persistent path to the generated PDF.
-- `generated_pdf { ... }` — access to the PDF document API.
+- `generated_pdf` — the PDF document API.
 - `fail(message)` — marks this test as failed with the given message.
 
 Local variables from the surrounding fixture definition can be used inside a

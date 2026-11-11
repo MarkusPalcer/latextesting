@@ -6,16 +6,15 @@ Use `generated_pdf` when a test needs to inspect the PDF document:
 
 ```ruby
 test "The document has six pages" do
-  generated_pdf do
-    fail "Expected six pages, found #{pages.count}" unless pages.count == 6
-  end
+  fail "Expected six pages, found #{generated_pdf.pages.count}" unless generated_pdf.pages.count == 6
 end
 ```
 
-Inside the block, HexaPDF document methods such as `pages` are available along
-with test helpers such as `fail`, `log`, and `pdf_path`. The block is evaluated
-only after the fixture has been compiled. LatexTesting declares HexaPDF as a
-runtime dependency and loads it when `generated_pdf` is first used.
+`generated_pdf` returns the PDF document wrapper, which exposes HexaPDF document
+methods such as `pages` along with test helpers such as `fail`, `log`, and
+`pdf_path`. It is available only after the fixture has been compiled.
+LatexTesting declares HexaPDF as a runtime dependency and loads it when
+`generated_pdf` is first used.
 
 `pages` is a collection proxy: indexing and enumeration return page proxies
 that forward HexaPDF page methods and add:
@@ -35,13 +34,11 @@ normalized components as an array and also exposes `color_space` and
 
 ```ruby
 test "The header is 5 mm from the top of page 1" do
-  generated_pdf do
-    page = pages[0]
-    header = page.frames.single { |frame| frame.color == [0.75, 0, 0] }
-    top_margin = page.boundary.top - header[:top]
-    margin_mm = page.convert_unit(top_margin, LatexTesting::TargetUnit::MILLIMETERS)
-    fail "Expected 5 mm, found #{margin_mm.round(3)} mm" unless (margin_mm - 5).abs <= 0.01
-  end
+  page = generated_pdf.pages[0]
+  header = page.frames.single { |frame| frame.color == [0.75, 0, 0] }
+  top_margin = page.boundary.top - header[:top]
+  margin_mm = page.convert_unit(top_margin, LatexTesting::TargetUnit::MILLIMETERS)
+  fail "Expected 5 mm, found #{margin_mm.round(3)} mm" unless (margin_mm - 5).abs <= 0.01
 end
 ```
 
