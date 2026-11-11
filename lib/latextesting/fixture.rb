@@ -14,7 +14,7 @@ module LatexTesting
       @expect_compilation_failure = false
       @tests = []
       @test_names = {}
-      @output_pdf_path = File.join(@output_dir, "fixture.pdf")
+      @output_pdf_path = File.join(File.dirname(@output_dir), "#{@name}.pdf")
     end
 
     def test(name, &block)
@@ -82,6 +82,7 @@ module LatexTesting
         file: @file,
         input_dir: @input_dir,
         output_dir: @output_dir,
+        output_pdf_path: @output_pdf_path,
         expect_compilation_failure: @expect_compilation_failure,
         build: ->(source, directory) { build_raw(source, directory) }
       ).build(temp_dir)

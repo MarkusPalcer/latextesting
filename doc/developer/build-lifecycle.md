@@ -17,11 +17,14 @@ For each configured `Fixture`, the framework:
 The host helper must return a truthy value for a successful compilation and
 place the fixture's PDF and log in the supplied directory. `Fixture#build`
 checks that a successful build actually produced a PDF. A failed build saves
-its log in the fixture output directory.
+its log beside the PDF.
 
-Successful PDFs are copied once per fixture. The directory hierarchy is
-derived from the definition file and fixture name. The output root is `out/`
-under the current project directory.
+Successful PDFs are copied once per fixture to a sibling file named after the
+fixture (for example, `out/test/.../A6 Geometry.pdf`). Failed build logs are
+stored beside the PDF with a `.log` extension (for example,
+`out/test/.../A6 Geometry.log`). The directory hierarchy is derived from the
+definition file and fixture name. The output root is `out/` under the current
+project directory.
 
 `Test#execute` catches `StandardError`, prints `PASS`, `PASSED`,
 `MANUAL TEST SKIPPED`, or `FAIL`, and returns a Boolean. A skipped manual test

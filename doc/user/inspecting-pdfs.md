@@ -50,5 +50,5 @@ ambiguous stroke geometry fails explicitly; the API does not claim that PDF
 content streams contain semantic frame objects.
 
 Use `pdf_path` directly if a test needs to pass the generated file to another
-tool. The runner copies the PDF to the fixture's output directory before its
-tests run, so the path remains available after the test completes.
+tool. The runner copies the PDF to a persistent path named after the fixture
+before its tests run, so the path remains available after the test completes.

@@ -210,10 +210,16 @@ RSpec.describe LatexTesting do
     Dir.mktmpdir do |directory|
       fixture = create_fixture(directory, "Stale PDF")
       fixture.manual_test("The output PDF exists")
+      legacy_output_dir = File.join(directory, "Stale PDF")
+      FileUtils.mkdir_p(legacy_output_dir)
+      File.write(File.join(legacy_output_dir, "fixture.pdf"), "old pdf")
+      File.write(File.join(legacy_output_dir, "fixture.log"), "old log")
 
       expect { expect(fixture.execute).to be(true) }
         .to output(/MANUAL TEST SKIPPED/).to_stdout
-      expect(File.file?(File.join(directory, "fixture.pdf"))).to be(true)
+      expect(File.file?(File.join(directory, "Stale PDF.pdf"))).to be(true)
+      expect(File.file?(File.join(legacy_output_dir, "fixture.pdf"))).to be(false)
+      expect(File.file?(File.join(legacy_output_dir, "fixture.log"))).to be(false)
 
       fixture.expect_compilation_failure
       allow(fixture).to receive(:build_raw) do |_source, temp_dir|
@@ -223,7 +229,22 @@ RSpec.describe LatexTesting do
 
       expect { expect(fixture.execute).to be(false) }
         .to output(/No PDF file produced by LaTeX build/).to_stdout
-      expect(File.file?(File.join(directory, "fixture.pdf"))).to be(false)
+      expect(File.file?(File.join(directory, "Stale PDF.pdf"))).to be(false)
+      expect(File.read(File.join(directory, "Stale PDF.log"))).to eq("expected failure")
+    end
+  end
+
+  it "writes the named PDF beside the fixture output directory" do
+    Dir.mktmpdir do |directory|
+      fixture = create_fixture(directory, "Named output")
+      fixture.test("The PDF path uses the fixture name") do
+        expect(File.basename(pdf_path)).to eq("Named output.pdf")
+      end
+
+      expect { expect(fixture.execute).to be(true) }
+        .to output(/The PDF path uses the fixture name.*PASS/m).to_stdout
+      expect(File.file?(File.join(directory, "Named output.pdf"))).to be(true)
+      expect(File.directory?(File.join(directory, "Named output"))).to be(false)
     end
   end
 
@@ -265,7 +286,7 @@ RSpec.describe LatexTesting do
       expect do
         expect(fixture.execute(user_interaction: true)).to be(false)
       end.to output(
-        /The title is visible - PDF: .*fixture\.pdf.*Does this test pass\?.*FAIL.*Manual test rejected/m
+        /The title is visible - PDF: .*Manual\.pdf.*Does this test pass\?.*FAIL.*Manual test rejected/m
       ).to_stdout
     end
   end
@@ -274,7 +295,7 @@ RSpec.describe LatexTesting do
     File.write(File.join(directory, "fixture.tex"), "")
     fixture = LatexTesting::Fixture.new(
       name,
-      output_dir: directory,
+      output_dir: File.join(directory, name),
       input_dir: directory,
       definition_file: File.join(directory, "tests.rb")
     )
@@ -294,7 +315,7 @@ RSpec.describe LatexTesting::Test do
       File.write(File.join(directory, "fixture.tex"), "")
       fixture = LatexTesting::Fixture.new(
         "Manual",
-        output_dir: directory,
+        output_dir: File.join(directory, "Manual"),
         input_dir: directory,
         definition_file: File.join(directory, "tests.rb")
       )
