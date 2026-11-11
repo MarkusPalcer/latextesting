@@ -20,7 +20,7 @@ module LatexTesting
       @failure_message = nil
       report_result(execute_block(execution))
       true
-    rescue StandardError => e
+    rescue RSpec::Expectations::ExpectationNotMetError, StandardError => e
       message = @manual ? e.message : "#{@name}: #{e.message}"
       fail(message, prefix: false)
     end

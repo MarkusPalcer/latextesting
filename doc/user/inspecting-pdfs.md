@@ -6,7 +6,7 @@ Use `generated_pdf` when a test needs to inspect the PDF document:
 
 ```ruby
 test "The document has six pages" do
-  fail "Expected six pages, found #{generated_pdf.pages.count}" unless generated_pdf.pages.count == 6
+  expect(generated_pdf.pages.count).to eq(6)
 end
 ```
 
@@ -38,7 +38,7 @@ test "The header is 5 mm from the top of page 1" do
   header = page.frames.single { |frame| frame.color == [0.75, 0, 0] }
   top_margin = page.boundary.top - header[:top]
   margin_mm = page.convert_unit(top_margin, LatexTesting::TargetUnit::MILLIMETERS)
-  fail "Expected 5 mm, found #{margin_mm.round(3)} mm" unless (margin_mm - 5).abs <= 0.01
+  expect(margin_mm).to be_within(0.01).of(5)
 end
 ```
 

@@ -1,9 +1,13 @@
 # frozen_string_literal: true
 
+require "rspec/expectations"
+
 module LatexTesting
   class Assertion
     # Shares log and PDF access across the tests of one compiled fixture.
     class Execution
+      include RSpec::Matchers
+
       def initialize(temp_dir, file, output_pdf_path: nil, user_interaction: false)
         @temp_dir = temp_dir
         @file = file

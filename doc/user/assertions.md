@@ -35,7 +35,7 @@ fixture "Conflicting field diagnostic" do
 
   test "The log names the existing field" do
     expected = "existing field name."
-    fail "Expected diagnostic was not found" unless log.include?(expected)
+    expect(log).to include(expected)
   end
 end
 ```
@@ -47,7 +47,12 @@ The test block provides:
 - `log` — the current fixture's LaTeX log as a string.
 - `pdf_path` — the persistent path to the generated PDF.
 - `generated_pdf` — the PDF document API.
+- `expect(actual).to matcher` — RSpec expectations and matchers, including
+  automatic expected/actual failure messages.
 - `fail(message)` — marks this test as failed with the given message.
+
+RSpec is a runtime dependency of LatexTesting and its matchers are available
+inside every automated test block.
 
 Local variables from the surrounding fixture definition can be used inside a
 test block. Each test runs independently; failures do not stop later tests for
