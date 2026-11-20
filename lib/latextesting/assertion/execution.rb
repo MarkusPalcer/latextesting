@@ -7,6 +7,7 @@ module LatexTesting
     # Shares log and PDF access across the tests of one compiled fixture.
     class Execution
       include RSpec::Matchers
+      include BoundaryMatchers
 
       def initialize(temp_dir, file, output_pdf_path: nil, user_interaction: false)
         @temp_dir = temp_dir

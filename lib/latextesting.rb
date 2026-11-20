@@ -7,6 +7,8 @@ require "pathname"
 require "tmpdir"
 
 require_relative "latextesting/error"
+require_relative "latextesting/boundary"
+require_relative "latextesting/assertion/boundary_matchers"
 require_relative "latextesting/assertion/execution"
 require_relative "latextesting/target_unit"
 require_relative "latextesting/assertion/pdf_frame"

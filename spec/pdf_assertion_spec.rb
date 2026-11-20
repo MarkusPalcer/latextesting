@@ -60,6 +60,7 @@ RSpec.describe LatexTesting::Assertion::Execution::PDFExecution::Page do
     page[:UserUnit] = 2
     proxy = described_class.new(page)
 
+    expect(described_class::Boundary).to equal(LatexTesting::Boundary)
     expect([proxy.boundary.left, proxy.boundary.bottom, proxy.boundary.right, proxy.boundary.top])
       .to eq([10, 20, 610, 820])
     expect([proxy.boundary.width, proxy.boundary.height]).to eq([600, 800])

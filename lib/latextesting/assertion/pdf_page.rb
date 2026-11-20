@@ -6,20 +6,7 @@ module LatexTesting
       class PDFExecution
         # Delegates HexaPDF page methods and lazily exposes geometry assertions.
         class Page
-          Boundary = Struct.new(:left, :bottom, :right, :top, keyword_init: true) do
-            def initialize(**values)
-              super
-              freeze
-            end
-
-            def width
-              right - left
-            end
-
-            def height
-              top - bottom
-            end
-          end
+          Boundary = LatexTesting::Boundary
 
           def initialize(page)
             @page = page
@@ -36,10 +23,17 @@ module LatexTesting
             @frames ||= FrameCollection.new(extract_frames)
           end
 
-          def convert_unit(value, target_unit)
-            unless value.is_a?(Numeric) && target_unit.is_a?(Numeric)
-              raise ArgumentError, "value and target unit must be numeric"
+          def text_lines
+            @text_lines ||= begin
+              require "hexapdf"
+              require_relative "pdf_text_line_extractor"
+              TextLineExtractor.new(@page).extract
             end
+          end
+
+          def convert_unit(value, target_unit)
+            validate_conversion_arguments(value, target_unit)
+            return convert_boundary(value, target_unit) if value.is_a?(Boundary)
 
             value * (self[:UserUnit] || 1) * target_unit
           end
@@ -55,6 +49,22 @@ module LatexTesting
           end
 
           private
+
+          def validate_conversion_arguments(value, target_unit)
+            return if (value.is_a?(Numeric) || value.is_a?(Boundary)) && target_unit.is_a?(Numeric)
+
+            raise ArgumentError, "value must be numeric or a Boundary and target unit must be numeric"
+          end
+
+          def convert_boundary(boundary, target_unit)
+            factor = (self[:UserUnit] || 1) * target_unit
+            Boundary.new(
+              left: boundary.left * factor,
+              top: boundary.top * factor,
+              right: boundary.right * factor,
+              bottom: boundary.bottom * factor
+            )
+          end
 
           def delegated_method?(name, include_private)
             @page.respond_to?(name, include_private)

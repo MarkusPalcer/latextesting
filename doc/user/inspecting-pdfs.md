@@ -23,9 +23,29 @@ that forward HexaPDF page methods and add:
   `top`, `width`, and `height`) in PDF user-space units.
 - `page.frames` — a lazily parsed and cached enumerable of recognized colored
   rectangular frames.
-- `page.convert_unit(value, target_unit)` — converts a PDF user-space
-  measurement, applying the page's `/UserUnit`. Use
-  `LatexTesting::TargetUnit::MILLIMETERS` for millimeters.
+- `page.text_lines` — a lazily parsed and cached enumerable of lines, each with
+  `text` and `boundary`. Line boundaries use PDF user-space units relative to
+  the MediaBox's top-left corner and include the font bounding boxes of their
+  glyphs. Text is grouped into horizontal lines and gaps are used to reconstruct
+  omitted word spaces; rotated or complex layouts do not have a guaranteed
+  reading order.
+- `page.convert_unit(value, target_unit)` — converts a numeric PDF user-space
+  measurement or all four edges of a `LatexTesting::Boundary`, applying the
+  page's `/UserUnit`. Use `LatexTesting::TargetUnit::MILLIMETERS` for
+  millimeters.
+
+`LatexTesting::Boundary` represents `left`, `top`, `right`, and `bottom` edges;
+its `width` and `height` are positive differences. Use the `be_within` matcher
+to check that a line boundary stays inside a containing boundary. Edge contact
+and identical boundaries are accepted; both boundaries must use the same
+coordinate origin and unit:
+
+```ruby
+page = generated_pdf.pages[0]
+line = page.text_lines.find { |candidate| candidate.text.start_with?("FRONT CONTENT LINE") }
+line_boundary = page.convert_unit(line.boundary, LatexTesting::TargetUnit::MILLIMETERS)
+expect(line_boundary).to be_within(expected_front_content_boundary)
+```
 
 Frames expose `color`, `stroke_width`, and the `left`, `bottom`, `right`, and
 `top` edges, including half the stroke width. The color compares to its
